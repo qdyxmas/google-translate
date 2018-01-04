@@ -20,6 +20,12 @@ from Global import *
 
 reload(sys)
 sys.setdefaultencoding('utf-8')
+
+sys.setdefaultencoding('utf-8')
+execpth=cur_file_dir()
+logpath=os.path.join(execpth,u'日志.txt')
+fp=open(logpath,'a+')
+
 class RunThread(QtCore.QThread):
     #把打印的字符串发送给UI主线程
     signal_text= QtCore.pyqtSignal(str,bool) # 信号
@@ -44,11 +50,21 @@ class RunThread(QtCore.QThread):
         self.fd.flush()
     def run(self):
         #循环父节点的字典
+        
         for k,v in self.parent.exceldict.iteritems():
-            for key,value in v.iteritems():
+            # for key,value in v.iteritems():
+            row = 2
+            for key,value in v:
+                if not key.strip():
+                    row=row+1
+                    continue
                 lang = self.parent.py2js.translate(value)
-                msg = "expe:%s fact:%s------{" %(k,lang)+value
+                msg = "row= %d expe:%s fact:%s------{" %(row,k,lang)+value
                 msg = msg +"}"
+                row=row+1
+                print "row=%d ,k=%s" %(row,k)
+                # if isinstance(k,bool):
+                    # continue
                 if k in lang:
                     self.signal_text.emit(msg,True)
                 else:
@@ -58,6 +74,7 @@ class RunThread(QtCore.QThread):
                         continue
                     self.writelog(msg)
                     self.signal_text.emit(msg,False)
+        self.fd.close()            
         self.signal_end.emit()
 class PyToJs():
     def chklanguage(self,flag,*langjson):
@@ -117,7 +134,7 @@ class Form(QWidget):
         self.connect(self.ui.cfgbutton, SIGNAL("clicked()"),self.select_cfgfile)  
         self.connect(self.ui.excelbutton, SIGNAL("clicked()"),self.select_excel)  
         self.connect(self.ui.startchk, SIGNAL("clicked()"),self.startchk)  
-        self.setWindowTitle("Translate")
+        self.setWindowTitle(u"腾达语种检测工具")
         self.rootdir = ""
         self.cfgflg = 0
         self.excelflag = 0
@@ -167,7 +184,10 @@ class Form(QWidget):
     def writelogmsg(self,msg,flag):
         self.ui.logmsg.setText(msg)
     def test_end(self):
-         QtGui.QMessageBox.information( self, "check end", u"测试完成")
+        QtGui.QMessageBox.information( self, "check end", u"测试完成")
+        self.ui.startchk.setText(u"开始检查")
+        self.ui.statuslabel.setText(u"检查完成")
+        self.runflag = 0
     def parser_cfgfile(self):
         kargs={}
         cf = ConfigParser.ConfigParser()
@@ -193,15 +213,25 @@ class Form(QWidget):
             dictmap[chr(i)] = index
             index = index+1
         for key,value in multi_dict['lang'].iteritems():
-            excelDict[key] = {}
+            # excelDict[key] = {}
+            excelDict[key] = []
         for i in range(1,nrows):
             v=table.row_values(i)
-            if v[0].strip():
-                for key,value in multi_dict['lang'].iteritems():
-                    excelDict[key][v[0]] = v[dictmap[multi_dict['lang'][key]]]
+            if not isinstance(v[0],basestring):
+                v = list(map(unicode,v))
+            # v[0] = str(v[0])
+            for key,value in multi_dict['lang'].iteritems():
+                # excelDict[key][v[0]] = v[dictmap[multi_dict['lang'][key]]]
+                if v[0].strip():
+                    excelDict[key].append((v[0],v[dictmap[multi_dict['lang'][key]]]))
+                else:
+                    excelDict[key].append(("",""))
         return excelDict
 if __name__ == "__main__":
-    app = QApplication(sys.argv)  
-    form = Form()  
-    form.show()  
-    app.exec_() 
+    try:
+        app = QApplication(sys.argv)  
+        form = Form()  
+        form.show()  
+        app.exec_()
+    except Exception,e:
+        fd.write(str(e))
