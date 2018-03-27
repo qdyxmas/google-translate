@@ -1,0 +1,165 @@
+#coding=utf8
+import os
+import re
+import requests
+import urllib2
+import time
+import demjson
+path = os.path.realpath(__file__)
+import execjs
+langmap = {'zh':u'中文','jp':u'日语','jpka':u'日语假名','th':u'泰语','fra':u'法语','en':u'英语','spa':u'西班牙语','kor':u'韩语','tr':u'土耳其语','vie':u'越南语','ms':u'马来语','de':u'德语','ru':u'俄语','ir':u'伊朗语','ara':u'阿拉伯语','est':u'爱沙尼亚语','be':u'白俄罗斯语','bul':u'保加利亚语','hi':u'印地语','is':u'冰岛语','pl':u'波兰语','fa':u'波斯语','dan':u'丹麦语','tl':u'菲律宾语','fin':u'芬兰语','nl':u'荷兰语','ca':u'加泰罗尼亚语','cs':u'捷克语','hr':u'克罗地亚语','lv':u'拉脱维亚语','lt':u'立陶宛语','rom':u'罗马尼亚语','af':u'南非语','no':u'挪威语','pt_BR':u'巴西语','pt':u'葡萄牙语','swe':u'瑞典语','sr':u'塞尔维亚语','eo':u'世界语','sk':u'斯洛伐克语','slo':u'斯洛文尼亚语','sw':u'斯瓦希里语','uk':u'乌克兰语','iw':u'希伯来语','el':u'希腊语','hu':u'匈牙利语','hy':u'亚美尼亚语','it':u'意大利语','id':u'印尼语','sq':u'阿尔巴尼亚语','am':u'阿姆哈拉语','as':u'阿萨姆语','az':u'阿塞拜疆语','eu':u'巴斯克语','bn':u'孟加拉语','bs':u'波斯尼亚语','gl':u'加利西亚语','ka':u'格鲁吉亚语','gu':u'古吉拉特语','ha':u'豪萨语','ig':u'伊博语','iu':u'因纽特语','ga':u'爱尔兰语','zu':u'祖鲁语','kn':u'卡纳达语','kk':u'哈萨克语','ky':u'吉尔吉斯语','lb':u'卢森堡语','mk':u'马其顿语','mt':u'马耳他语','mi':u'毛利语','mr':u'马拉提语','ne':u'尼泊尔语','or':u'奥利亚语','pa':u'旁遮普语','qu':u'凯楚亚语','tn':u'塞茨瓦纳语','si':u'僧加罗语','ta':u'泰米尔语','tt':u'塔塔尔语','te':u'泰卢固语','ur':u'乌尔都语','uz':u'乌兹别克语','cy':u'威尔士语','yo':u'约鲁巴语','yue':u'粤语','wyw':u'文言文','cht':u'中文繁体'}
+class Baidu():
+    def __init__(self,*kargs):
+        self.srclang = 'en'
+        self.tolang = 'zh'
+        self.cookies = {}
+        now = int(time.time())
+        self.session = requests.session()
+        self.headers =  {
+            "Accept":"*/*",
+            "Accept-Language":"zh-CN,zh;q=0.9",
+            "Content-Type":"application/x-www-form-urlencoded; charset=UTF-8",
+            "Host":"fanyi.baidu.com",
+            "Origin":"http://fanyi.baidu.com",
+            "Referer":"http://fanyi.baidu.com/",
+            "User-Agent":"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36",
+            "X-Requested-With":"XMLHttpRequest"
+        }
+        self.srclanglst = [{"value":self.srclang,"text":langmap[self.srclang]},{"value":self.tolang,"text":langmap[self.tolang]}]
+        self.tolanglst = [{"value":self.tolang,"text":langmap[self.tolang]},{"value":self.srclang,"text":langmap[self.srclang]}]
+        self.srclanglst = urllib2.quote(unicode(self.srclanglst))
+        self.tolanglst = urllib2.quote(unicode(self.tolanglst))
+        cookiesdict = {
+        'locale':'zh',
+        'BAIDUID':'1E42DAECAE59A4294ABC8C70D5D822A0:FG=1',  #可以通过fanyi.baidu.com 获取
+        'BIDUPSID':'1E42DAECAE59A4294ABC8C70D5D822A0',      #可以通过fanyi.baidu.com 获取
+        'Hm_lvt_64ecd82404c51e03dc91cb9e8c025574':now, #可以通过fanyi.baidu.com 获取
+        'Hm_lpvt_64ecd82404c51e03dc91cb9e8c025574':now,
+        'from_lang_often':self.srclanglst,
+        'REALTIME_TRANS_SWITCH':'1',
+        'FANYI_WORD_SWITCH':'0',
+        'HISTORY_SWITCH':'1',
+        'SOUND_SPD_SWITCH':'1',
+        'SOUND_PREFER_SWITCH':'1',
+        'to_lang_often':self.tolanglst,
+        'PSTM': now,
+        'H_PS_PSSID': '1457_21083_17001'
+        }
+        cookies= {}
+        for k,v in cookiesdict.iteritems():
+            cookies[k] = v
+        self.cookies = cookies
+        self.get_index()
+        self.get_token()
+    #获取签名信息s
+    def get_index(self):
+        headers = {'User-Agent':'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36'}
+        req = self.session.get("https://www.baidu.com",headers=headers)
+        for k,v in req.cookies.iteritems():
+            self.cookies[k] = v
+        self.cookies['Hm_lvt_64ecd82404c51e03dc91cb9e8c025574'] = req.cookies['PSTM']
+        self.cookies['Hm_lpvt_64ecd82404c51e03dc91cb9e8c025574'] = req.cookies['PSTM']
+        self.cookies['PSTM'] = req.cookies['PSTM']
+    def get_sign(self,content):
+        gkt = '320305.131321201'
+        ctx = execjs.compile("""
+            function a(r, o) {
+                for (var t = 0; t < o.length - 2; t += 3) {
+                    var a = o.charAt(t + 2);
+                    a = a >= "a" ? a.charCodeAt(0) - 87 : Number(a),
+                    a = "+" === o.charAt(t + 1) ? r >>> a : r << a,
+                    r = "+" === o.charAt(t) ? r + a & 4294967295 : r ^ a
+                }
+                return r
+            }
+            var C = null;
+            var hash = function(r, _gtk) {
+                var o = r.length;
+                o > 30 && (r = "" + r.substr(0, 10) + r.substr(Math.floor(o / 2) - 5, 10) + r.substr(-10, 10));
+                var t = void 0
+                  , t = null !== C ? C : (C = _gtk || "") || "";
+                for (var e = t.split("."), h = Number(e[0]) || 0, i = Number(e[1]) || 0, d = [], f = 0, g = 0; g < r.length; g++) {
+                    var m = r.charCodeAt(g);
+                    128 > m ? d[f++] = m : (2048 > m ? d[f++] = m >> 6 | 192 : (55296 === (64512 & m) && g + 1 < r.length && 56320 === (64512 & r.charCodeAt(g + 1)) ? (m = 65536 + ((1023 & m) << 10) + (1023 & r.charCodeAt(++g)),
+                    d[f++] = m >> 18 | 240,
+                    d[f++] = m >> 12 & 63 | 128) : d[f++] = m >> 12 | 224,
+                    d[f++] = m >> 6 & 63 | 128),
+                    d[f++] = 63 & m | 128)
+                }
+                for (var S = h, u = "+-a^+6", l = "+-3^+b+-f", s = 0; s < d.length; s++)
+                    S += d[s],
+                    S = a(S, u);
+                return S = a(S, l),
+                S ^= i,
+                0 > S && (S = (2147483647 & S) + 2147483648),
+                S %= 1e6,
+                S.toString() + "." + (S ^ h)
+            }
+         """)
+        sign = ctx.call("hash",content, gkt)
+        # print "sign=",sign
+        return sign
+    #获取tkcon
+    def get_token(self):
+        url =  "http://fanyi.baidu.com/"
+        req = self.session.get(url,headers=self.headers)
+        ret = re.findall("(token:.*[0-9a-f]{32})",req.content)
+        systime = re.findall("(systime.*[0-9]+)",req.content)
+        token = None
+        self.ltime = time.time()
+        # print "ret=",ret
+        if ret:
+            self.token = ret[0].split("'")[-1]
+        for k,v in req.cookies.iteritems():
+            self.cookies[k] = v
+        if self.ltime:
+            self.ltime = systime[0].split("'")[-1]
+        # print "self.token=",self.token
+        return token
+    def get_cookies(self,content):
+        url = 'http://fanyi.baidu.com/langdetect'
+        postdata = {'query':urllib2.quote(content)}
+        postdata1 = {'kw':urllib2.quote(content)}
+        req = self.session.post("http://fanyi.baidu.com/sug",headers=self.headers,data = postdata1,cookies = self.cookies)
+        req = self.session.post(url,headers=self.headers,data = postdata,cookies = self.cookies)
+        # print req.content
+        # print req.cookies
+    def translate(self,content):
+        #对数据编码
+        # tolang = """[{"value":"%s","text":"%s"},{"value":"%s","text":"%s"}]""" %(self.tolang,langmap[self.tolang],self.srclang,langmap[self.srclang])
+        
+        if isinstance(content, unicode):
+            content = content.encode("UTF-8")
+        sign = self.get_sign(content)
+        self.get_cookies(content)
+        # self.get_cookies(content)
+        content = urllib2.quote(content)
+        headers =  {
+            "Accept":"*/*",
+            "Accept-Encoding":"gzip, deflate",
+            "Accept-Language":"zh-CN,zh;q=0.9",
+            "Content-Type":"application/x-www-form-urlencoded; charset=UTF-8",
+            "Host":"fanyi.baidu.com",
+            "Origin":"http://fanyi.baidu.com",
+            "Referer":"http://fanyi.baidu.com/",
+            "User-Agent":"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.186 Safari/537.36",
+            "X-Requested-With":"XMLHttpRequest"
+        }
+        url = "http://fanyi.baidu.com/v2transapi"
+        postdata = {
+                "from":self.srclang,
+                "to":self.tolang,
+                "query":content,
+                "transtype":"realtime",
+                "simple_means_flag":"3",
+                "sign":sign,
+                "token":self.token
+            }
+        req = self.session.post(url,headers=headers,data=postdata,cookies=self.cookies)
+        result = demjson.decode(req.content)
+        data = result['trans_result']['data'][0]['dst']
+        print data
+        return data
+if __name__ == "__main__":
+    c=Baidu()
+    c.translate(u"name 'python' is not defined")
